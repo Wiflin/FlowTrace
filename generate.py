@@ -404,11 +404,34 @@ class All2allGenerator:
             while n > 0:
                 dst_i = int(self.random.uniform(low=0, high=self.n_dst))
                 if src_i != dst_i:
-                    size = int(self.size_gen(self.random))
+                    size = int(self.size_gen(self.random)) + 1
                     flow = [self.src_start + src_i, self.dst_start + dst_i, size]
                     flows.append(flow)
                     n -= 1
         return flows
+
+
+class All2allOnceGenerator(All2allGenerator):
+    def __init__(self):
+        super(All2allOnceGenerator, self).__init__()
+        self.nflow_end = self.time_end = 1
+
+    def set_time_end(self, end):
+        pass
+
+    def set_nflow_end(self, end):
+        pass
+
+    def do_gen(self):
+        flows = []
+        for src_i in range(self.n_src):
+            for dst_i in range(self.n_dst):
+                if src_i != dst_i:
+                    size = int(self.size_gen(self.random)) + 1
+                    flow = [self.src_start + src_i, self.dst_start + dst_i, size]
+                    flows.append(flow)
+        return flows
+
 
 
 if __name__ == '__main__':
@@ -426,14 +449,17 @@ if __name__ == '__main__':
     work = generate_workload(workload_file)
     print("workload %s, mean %f" % (workload_file, mean))
 
+    seed = int(args.seed)
     nodes = int(args.nodes)
     load = float(args.load)
     poisson = float(args.poisson)
     output_base = args.output_dir
     output_file = os.path.join(output_base, os.path.basename(workload_file).split('.')[0] + "-%dx%d-%dp.csv" % (nodes, nodes, int(load * 100)))
+    output_file = os.path.join(output_base, os.path.basename(workload_file).split('.')[0] + "-%dx%d-all2all.csv" % (nodes, nodes))
     print("output", output_file)
 
-    g = All2allGenerator()
+    g = All2allOnceGenerator()
+    g.set_random_seed(seed)
     g.set_n_node(nodes)
     g.set_poisson(poisson)
     g.set_size_mean(mean)
