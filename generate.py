@@ -8,6 +8,7 @@ from numpy import random
 MSG_SIZE = 1
 
 
+
 ############################################################
 #                        utility
 ############################################################
@@ -319,8 +320,9 @@ class DeprecatedGenerator:
 
 
 class All2allGenerator:
-    src_start = 1
-    dst_start = 1
+    tor_nodes = 16
+    src_start = 0
+    dst_start = 0
     time_end = 0
     nflow_end = 0
     n_src = 0
@@ -372,7 +374,7 @@ class All2allGenerator:
             print("Real generated load with an error > 10%%, raw %f, real %f" % (interval, interval_ceil))
 
         real_load = self.load * interval/interval_ceil
-        print("load --- raw  %f, real %f" % (self.load, real_load))
+        print("interval %f\n load --- raw  %f, real %f" % (interval, self.load, real_load))
         return interval_ceil
 
     def generate(self):
@@ -403,6 +405,8 @@ class All2allGenerator:
             n = self.random.poisson(lam=self.poisson)
             while n > 0:
                 dst_i = int(self.random.uniform(low=0, high=self.n_dst))
+                if int(src_i/self.tor_nodes) == int(dst_i/self.tor_nodes):
+                    continue
                 if src_i != dst_i:
                     size = int(self.size_gen(self.random)) + 1
                     flow = [self.src_start + src_i, self.dst_start + dst_i, size]
@@ -454,11 +458,11 @@ if __name__ == '__main__':
     load = float(args.load)
     poisson = float(args.poisson)
     output_base = args.output_dir
-    output_file = os.path.join(output_base, os.path.basename(workload_file).split('.')[0] + "-%dx%d-%dp.csv" % (nodes, nodes, int(load * 100)))
-    output_file = os.path.join(output_base, os.path.basename(workload_file).split('.')[0] + "-%dx%d-all2all.csv" % (nodes, nodes))
+    output_file = os.path.join(output_base, os.path.basename(workload_file).split('.')[0] + "-%dx%d-lam%d-%dp.csv" % (nodes, nodes, int(poisson), int(load * 100)))
+    # output_file = os.path.join(output_base, os.path.basename(workload_file).split('.')[0] + "-%dx%d-all2all.csv" % (nodes, nodes))
     print("output", output_file)
 
-    g = All2allOnceGenerator()
+    g = All2allGenerator()
     g.set_random_seed(seed)
     g.set_n_node(nodes)
     g.set_poisson(poisson)
@@ -466,7 +470,7 @@ if __name__ == '__main__':
     g.set_load(load)
     g.set_port_capacity(12500)
     g.set_size_gen(work)
-    g.set_time_end(500)
+    g.set_time_end(1000)
 
     flows = g.generate()
     write_traffic_flows_to_ns3txt(output_file, flows)
