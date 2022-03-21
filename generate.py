@@ -581,6 +581,8 @@ if __name__ == '__main__':
         g = All2allInOutCastSmooth()
         degree = int(args.inoutcast)
         g.set_degree(degree)
+        output_file = os.path.join(output_base, os.path.basename(workload_file).split('.')[0] + "-%dx%d-lam%d-%dp-dg%d.csv" % 
+            (nodes, nodes, int(poisson), int(load * 100), degree))
 
     g.set_random_seed(seed)
     g.set_n_node(nodes)
