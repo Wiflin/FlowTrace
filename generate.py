@@ -467,6 +467,83 @@ class All2allGeneratorSmooth(All2allGenerator):
             
         return flow_list
 
+class All2allInOutCastSmooth(All2allGenerator):
+    inoutcast_degree = 3
+
+    def __init__(self):
+        super(All2allInOutCastSmooth, self).__init__()
+
+    def set_degree(self, degree):
+        self.inoutcast_degree = degree
+
+    def get_interval(self):
+        assert self.poisson and self.size_mean and self.capacity and self.load
+        size_once = self.poisson * self.size_mean * self.inoutcast_degree       # mean size generate once
+        cap_time_unit = self.capacity * self.load
+        interval = size_once / cap_time_unit
+        interval_ceil = math.ceil(interval)
+        if interval/interval_ceil < 0.9:
+            print("Real generated load with an error > 10%%, raw %f, real %f" % (interval, interval_ceil))
+
+        real_load = self.load * interval/interval_ceil
+        print("interval %f\n load --- raw  %f, real %f" % (interval, self.load, real_load))
+        return interval_ceil
+
+    def generate(self):
+        assert bool(self.nflow_end or self.time_end)
+
+        flow_list = []
+        clock = 0
+        interval = self.get_interval()
+
+        while True:
+            flow_once = self.do_gen(clock, interval)
+
+            flow_list.extend(flow_once)
+            clock += interval
+            count = len(flow_list)
+    
+            if self.nflow_end and count >= self.nflow_end:
+                break
+            if self.time_end and clock >= self.time_end:
+                break
+            
+        return flow_list
+
+    def do_gen(self, clock, interval):
+        assert self.n_src == self.n_dst
+        flows = []
+        n_node = self.n_src
+        for node in range(n_node):
+            n = self.random.poisson(lam=self.poisson)  # generate IO number
+
+            while n > 0:        # foreach IO, do:
+                is_incast = bool(self.random.randint(0,2))
+                n_peer = self.inoutcast_degree
+                # size = int(self.size_gen(self.random)) + 1  # copy size
+                clock_drift = self.random.uniform(0, interval)  # same arrival time for a IO group
+
+                while n_peer > 0: # select n peer
+                    peer = int(self.random.uniform(low=0, high=n_node))
+                    size = int(self.size_gen(self.random)) + 1  # independent size
+                    if int(node/self.tor_nodes) == int(peer/self.tor_nodes):
+                        continue
+
+                    src_i = dst_i = -1
+                    if is_incast:
+                        src_i, dst_i = peer, node
+                    else:
+                        src_i, dst_i = node, peer
+
+                    flow = [self.src_start + src_i, self.dst_start + dst_i, size, clock + clock_drift]
+                    flows.append(flow)
+                    n_peer -= 1
+                
+                n -= 1
+
+        clock_cmp = lambda flow: flow[3]
+        flows = sorted(flows, key=clock_cmp)       
+        return flows
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
@@ -476,6 +553,8 @@ if __name__ == '__main__':
     parser.add_argument('--nodes', dest='nodes', action='store', default=None, help="Specify the node numbers.")
     parser.add_argument('--load', dest='load', action='store', default=None, help="Specify the traffic load.")
     parser.add_argument('--poisson', dest='poisson', action='store', default=None, help="Specify the poisson.")
+    parser.add_argument('--generator', dest='generator', action='store', default=None, help="Specify the generator.")
+    parser.add_argument('--inoutcast', dest='inoutcast', action='store', default=3, help="Specify the in/outcast degree.")
     args = parser.parse_args()
 
     workload_file = args.workload
@@ -492,7 +571,17 @@ if __name__ == '__main__':
     # output_file = os.path.join(output_base, os.path.basename(workload_file).split('.')[0] + "-%dx%d-all2all.csv" % (nodes, nodes))
     print("output", output_file)
 
-    g = All2allGeneratorSmooth()
+    g = All2allGenerator()        # default
+    
+    if args.generator == 'All2allOnceGenerator':
+        g = All2allOnceGenerator()
+    elif args.generator == 'All2allGeneratorSmooth':
+        g = All2allGeneratorSmooth()
+    elif args.generator == 'All2allInOutCastSmooth':
+        g = All2allInOutCastSmooth()
+        degree = int(args.inoutcast)
+        g.set_degree(degree)
+
     g.set_random_seed(seed)
     g.set_n_node(nodes)
     g.set_poisson(poisson)
