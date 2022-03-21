@@ -436,6 +436,36 @@ class All2allOnceGenerator(All2allGenerator):
                     flows.append(flow)
         return flows
 
+class All2allGeneratorSmooth(All2allGenerator):
+    def __init__(self):
+        super(All2allGeneratorSmooth, self).__init__()
+
+    def generate(self):
+        assert bool(self.nflow_end or self.time_end)
+
+        flow_list = []
+        clock = 0
+        interval = self.get_interval()
+
+        while True:
+            flow_once = self.do_gen()
+            for l in flow_once:
+                clock_drift = self.random.uniform(0, interval)
+                l.append(clock + clock_drift) 
+
+            clock_cmp = lambda flow: flow[3]
+            flow_once = sorted(flow_once, key=clock_cmp)
+
+            flow_list.extend(flow_once)
+            clock += interval
+            count = len(flow_list)
+    
+            if self.nflow_end and count >= self.nflow_end:
+                break
+            if self.time_end and clock >= self.time_end:
+                break
+            
+        return flow_list
 
 
 if __name__ == '__main__':
@@ -462,7 +492,7 @@ if __name__ == '__main__':
     # output_file = os.path.join(output_base, os.path.basename(workload_file).split('.')[0] + "-%dx%d-all2all.csv" % (nodes, nodes))
     print("output", output_file)
 
-    g = All2allGenerator()
+    g = All2allGeneratorSmooth()
     g.set_random_seed(seed)
     g.set_n_node(nodes)
     g.set_poisson(poisson)
@@ -471,6 +501,7 @@ if __name__ == '__main__':
     g.set_port_capacity(12500)
     g.set_size_gen(work)
     g.set_time_end(1000)
+    g.set_nflow_end(5000)
 
     flows = g.generate()
     write_traffic_flows_to_ns3txt(output_file, flows)
