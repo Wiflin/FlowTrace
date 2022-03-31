@@ -436,6 +436,28 @@ class All2allOnceGenerator(All2allGenerator):
                     flows.append(flow)
         return flows
 
+class All2allOnceConflictDegree(All2allOnceGenerator):
+    degree = 1
+
+    def set_degree(self, degree):
+        self.degree = degree
+
+    def do_gen(self):
+        flows = []
+        n_node = self.n_src
+        flow_count = self.degree * n_node
+
+        while flow_count > 0:
+            src_i = int(self.random.uniform(low=0, high=self.n_src))
+            dst_i = int(self.random.uniform(low=0, high=self.n_dst))
+            if src_i != dst_i:
+                size = int(self.size_gen(self.random)) + 1
+                flow = [self.src_start + src_i, self.dst_start + dst_i, size]
+                flows.append(flow)
+                flow_count -= 1
+            
+        return flows
+
 class All2allGeneratorSmooth(All2allGenerator):
     def __init__(self):
         super(All2allGeneratorSmooth, self).__init__()
@@ -551,8 +573,8 @@ if __name__ == '__main__':
     parser.add_argument('--workload', dest='workload', action='store', default=None, help="Specify the traffic workload input.")
     parser.add_argument('--output_dir', dest='output_dir', action='store', default=None, help="Specify the output directory.")
     parser.add_argument('--nodes', dest='nodes', action='store', default=None, help="Specify the node numbers.")
-    parser.add_argument('--load', dest='load', action='store', default=None, help="Specify the traffic load.")
-    parser.add_argument('--poisson', dest='poisson', action='store', default=None, help="Specify the poisson.")
+    parser.add_argument('--load', dest='load', action='store', default=1, help="Specify the traffic load.")
+    parser.add_argument('--poisson', dest='poisson', action='store', default=1, help="Specify the poisson.")
     parser.add_argument('--generator', dest='generator', action='store', default=None, help="Specify the generator.")
     parser.add_argument('--inoutcast', dest='inoutcast', action='store', default=3, help="Specify the in/outcast degree.")
     args = parser.parse_args()
@@ -569,7 +591,7 @@ if __name__ == '__main__':
     output_base = args.output_dir
     output_file = os.path.join(output_base, os.path.basename(workload_file).split('.')[0] + "-%dx%d-lam%d-%dp.csv" % (nodes, nodes, int(poisson), int(load * 100)))
     # output_file = os.path.join(output_base, os.path.basename(workload_file).split('.')[0] + "-%dx%d-all2all.csv" % (nodes, nodes))
-    print("output", output_file)
+
 
     g = All2allGenerator()        # default
     
@@ -577,12 +599,20 @@ if __name__ == '__main__':
         g = All2allOnceGenerator()
     elif args.generator == 'All2allGeneratorSmooth':
         g = All2allGeneratorSmooth()
+    elif args.generator == 'All2allOnceConflictDegree':
+        g = All2allOnceConflictDegree()
+        degree = int(args.inoutcast)
+        g.set_degree(degree)
+        output_file = os.path.join(output_base, os.path.basename(workload_file).split('.')[0] + "-%dx%d-once-conflict-dg%d.csv" % 
+            (nodes, nodes, degree))
     elif args.generator == 'All2allInOutCastSmooth':
         g = All2allInOutCastSmooth()
         degree = int(args.inoutcast)
         g.set_degree(degree)
         output_file = os.path.join(output_base, os.path.basename(workload_file).split('.')[0] + "-%dx%d-lam%d-%dp-dg%d.csv" % 
             (nodes, nodes, int(poisson), int(load * 100), degree))
+            
+    print("output", output_file)
 
     g.set_random_seed(seed)
     g.set_n_node(nodes)
