@@ -436,27 +436,6 @@ class All2allOnceGenerator(All2allGenerator):
                     flows.append(flow)
         return flows
 
-class All2allOnceConflictDegree(All2allOnceGenerator):
-    degree = 1
-
-    def set_degree(self, degree):
-        self.degree = degree
-
-    def do_gen(self):
-        flows = []
-        n_node = self.n_src
-        flow_count = self.degree * n_node
-
-        while flow_count > 0:
-            src_i = int(self.random.uniform(low=0, high=self.n_src))
-            dst_i = int(self.random.uniform(low=0, high=self.n_dst))
-            if src_i != dst_i:
-                size = int(self.size_gen(self.random)) + 1
-                flow = [self.src_start + src_i, self.dst_start + dst_i, size]
-                flows.append(flow)
-                flow_count -= 1
-            
-        return flows
 
 class All2allGeneratorSmooth(All2allGenerator):
     def __init__(self):
@@ -488,6 +467,51 @@ class All2allGeneratorSmooth(All2allGenerator):
                 break
             
         return flow_list
+
+
+class All2allOnceConflictDegree(All2allGeneratorSmooth):
+    degree = 1
+
+    def __init__(self):
+        super(All2allOnceConflictDegree, self).__init__()
+        self.nflow_end = self.time_end = 1
+
+    def set_time_end(self, end):
+        pass
+
+    def set_nflow_end(self, end):
+        pass
+
+    def set_degree(self, degree):
+        self.degree = degree
+
+    def get_interval(self):
+        assert self.degree and self.size_mean and self.capacity and self.load
+        size_once = self.degree * self.size_mean        # mean size generate once
+        cap_time_unit = self.capacity * self.load
+        interval = size_once / cap_time_unit
+        interval_ceil = math.ceil(interval)
+        if interval/interval_ceil < 0.9:
+            print("Real generated load with an error > 10%%, raw %f, real %f" % (interval, interval_ceil))
+
+        real_load = self.load * interval/interval_ceil
+        print("interval %f\n load --- raw  %f, real %f" % (interval, self.load, real_load))
+        return interval_ceil
+
+    def do_gen(self):
+        flows = []
+        
+        for src_i in range(self.n_src):
+            n_flow = self.degree
+            while n_flow > 0:
+                dst_i = int(self.random.uniform(low=0, high=self.n_dst))
+                if src_i != dst_i:
+                    size = int(self.size_gen(self.random)) + 1
+                    flow = [self.src_start + src_i, self.dst_start + dst_i, size]
+                    flows.append(flow)
+                    n_flow -= 1
+            
+        return flows
 
 class All2allInOutCastSmooth(All2allGenerator):
     inoutcast_degree = 3
@@ -576,7 +600,7 @@ if __name__ == '__main__':
     parser.add_argument('--load', dest='load', action='store', default=1, help="Specify the traffic load.")
     parser.add_argument('--poisson', dest='poisson', action='store', default=1, help="Specify the poisson.")
     parser.add_argument('--generator', dest='generator', action='store', default=None, help="Specify the generator.")
-    parser.add_argument('--inoutcast', dest='inoutcast', action='store', default=3, help="Specify the in/outcast degree.")
+    parser.add_argument('--degree', dest='degree', action='store', default=3, help="Specify the in/outcast degree.")
     args = parser.parse_args()
 
     workload_file = args.workload
@@ -601,13 +625,13 @@ if __name__ == '__main__':
         g = All2allGeneratorSmooth()
     elif args.generator == 'All2allOnceConflictDegree':
         g = All2allOnceConflictDegree()
-        degree = int(args.inoutcast)
+        degree = int(args.degree)
         g.set_degree(degree)
-        output_file = os.path.join(output_base, os.path.basename(workload_file).split('.')[0] + "-%dx%d-once-conflict-dg%d.csv" % 
-            (nodes, nodes, degree))
+        output_file = os.path.join(output_base, os.path.basename(workload_file).split('.')[0] + "-%dx%d-once-dg%d-%dp.csv" % 
+            (nodes, nodes, degree, int(load * 100)))
     elif args.generator == 'All2allInOutCastSmooth':
         g = All2allInOutCastSmooth()
-        degree = int(args.inoutcast)
+        degree = int(args.degree)
         g.set_degree(degree)
         output_file = os.path.join(output_base, os.path.basename(workload_file).split('.')[0] + "-%dx%d-lam%d-%dp-dg%d.csv" % 
             (nodes, nodes, int(poisson), int(load * 100), degree))
