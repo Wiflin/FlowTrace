@@ -645,8 +645,8 @@ if __name__ == '__main__':
     g.set_load(load)
     g.set_port_capacity(12500)
     g.set_size_gen(work)
-    g.set_time_end(1000)
-    g.set_nflow_end(5000)
+    g.set_time_end(1000000)
+    g.set_nflow_end(4000)
 
     flows = g.generate()
     write_traffic_flows_to_ns3txt(output_file, flows)
