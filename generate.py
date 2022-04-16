@@ -564,7 +564,7 @@ class All2allInOutCastSmooth(All2allGenerator):
             n = self.random.poisson(lam=self.poisson)  # generate IO number
 
             while n > 0:        # foreach IO, do:
-                is_incast = bool(self.random.randint(0,2))
+                is_incast = 1 #bool(self.random.randint(0,2))
                 n_peer = self.inoutcast_degree
                 # size = int(self.size_gen(self.random)) + 1  # copy size
                 clock_drift = self.random.uniform(0, interval)  # same arrival time for a IO group
